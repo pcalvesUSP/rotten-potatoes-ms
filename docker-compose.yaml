@@ -1,0 +1,74 @@
+version: '3.8'
+
+volumes:
+  postegresql_vol:
+  mongo_vol:
+
+networks:
+   microservicos:
+      driver: bridge
+
+services:
+  postgresql:
+    image: postgres:14.2
+    ports:
+    - 5432:5432
+    networks:
+    - microservicos 
+    volumes:
+    - postegresql_vol:/data/db
+    restart: always
+    environment:
+      POSTGRES_USER: postuser
+      POSTGRES_PASSWORD: xpto123
+
+  review:
+    depends_on:
+    - postgresql
+    image: priscilaalv/review:v1
+    ports:
+    - 8081:80
+    networks:
+    - microservicos 
+    restart: always
+    environment:
+      ConnectionStrings__MyConnection: Host=postgresql;Database=postgres;Username=postuser;Password=xpto123;
+
+  mongodb:
+    image: mongo:5.0.6
+    ports: 
+    - 27017:27017
+    networks:
+    - microservicos
+    volumes:
+    - mongo_vol:/data/db
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongouser
+      MONGO_INITDB_ROOT_PASSWORD: mongopwd
+
+  movie:
+    image: priscilaalv/movie:v1
+    depends_on:
+    - mongodb
+    ports:
+    - 8181:8181
+    networks:
+    - microservicos
+    restart: always
+    environment:
+      MONGODB_URI: mongodb://mongouser:mongopwd@mongodb:27017/admin
+
+  rotten-potatoes-ms:
+    image: priscilaalv/rotten-potatoes-ms:v1
+    depends_on:
+    - review
+    - movie
+    ports:
+    - 5000:5000
+    networks:
+    - microservicos
+    restart: always
+    environment:
+      MOVIE_SERVICE_URI: http://movie:8181/
+      REVIEW_SERVICE_URI: http://review
